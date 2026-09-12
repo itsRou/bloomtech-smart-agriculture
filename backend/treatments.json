@@ -1,0 +1,4 @@
+{
+  "_comment": "Map your real class names (from class_names.json) to real treatment advice. This file ships empty on purpose - no treatment text from the thesis or codebase was available to populate it, and inventing agricultural advice here would be irresponsible. Remove this _comment key once you add real entries.",
+  "REPLACE_WITH_YOUR_CLASS_0": "REPLACE_WITH_REAL_TREATMENT_ADVICE"
+}

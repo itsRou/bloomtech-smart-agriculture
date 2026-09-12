@@ -31,6 +31,11 @@ migrate_working_dir/
 .pub/
 /build/
 
+# Generated localization output (regenerated automatically by `flutter pub
+# get` / `flutter gen-l10n` because pubspec.yaml sets `generate: true`)
+lib/l10n/app_localizations.dart
+lib/l10n/app_localizations_*.dart
+
 # Symbolication related
 app.*.symbols
 

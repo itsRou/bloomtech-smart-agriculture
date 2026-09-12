@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:percent_indicator/percent_indicator.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../helper/dimintions.dart';
+import '../../helper/notification_service.dart';
 import '../services_pages/services_page.dart';
 import 'ph_level_sensor_screen.dart';
 import 'soil_moisture_sensor_screen.dart';
@@ -26,6 +27,23 @@ class _SensorScreenState extends State<SensorScreen> {
   final DatabaseReference _tempRef = FirebaseDatabase.instance.ref(
     "/temperature_raw",
   );
+
+  // Edge-triggered flags so an alert fires once per dry/out-of-range spell
+  // instead of on every StreamBuilder rebuild.
+  bool _soilAlerting = false;
+  bool _phAlerting = false;
+  bool _lightAlerting = false;
+
+  void _maybeAlert({
+    required bool isAlerting,
+    required bool wasAlerting,
+    required VoidCallback onEnterAlert,
+  }) {
+    if (isAlerting && !wasAlerting) {
+      onEnterAlert();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     var localization = AppLocalizations.of(context)!;
@@ -132,6 +150,20 @@ class _SensorScreenState extends State<SensorScreen> {
                               ((1023 - raw) / (1023 - 300)) * 100;
                           moisturePercent = moisturePercent.clamp(0, 100);
 
+                          final soilIsDry = moisturePercent <= 30;
+                          _maybeAlert(
+                            isAlerting: soilIsDry,
+                            wasAlerting: _soilAlerting,
+                            onEnterAlert: () => NotificationService.addAlert(
+                              context,
+                              title: 'Soil Moisture',
+                              alertType: 'Water Alert',
+                              message:
+                                  'Soil moisture is low - irrigation may be needed.',
+                            ),
+                          );
+                          _soilAlerting = soilIsDry;
+
                           Color progressColor = getProgressColor(
                             moisturePercent,
                           );
@@ -189,15 +221,19 @@ class _SensorScreenState extends State<SensorScreen> {
                             );
                           }
 
-                          double humidityPercent = double.tryParse(
+                          double tempCelsius = double.tryParse(
                                 snapshot.data!.snapshot.value.toString(),
                               ) ??
                               0;
+                          // Gauge scaled 0-50°C; footer shows the actual
+                          // Celsius reading rather than a misleading percent.
+                          double tempGaugePercent =
+                              (tempCelsius / 50).clamp(0.0, 1.0);
 
                           return TweenAnimationBuilder<double>(
                             tween: Tween<double>(
                               begin: 0.0,
-                              end: humidityPercent / 100,
+                              end: tempGaugePercent,
                             ),
                             duration: const Duration(milliseconds: 800),
                             builder: (context, value, child) {
@@ -210,7 +246,7 @@ class _SensorScreenState extends State<SensorScreen> {
                                   "assets/images/carbon_temperature-hot.svg",
                                 ),
                                 footer: Text(
-                                  "${(value * 100).toInt()}%",
+                                  "${tempCelsius.toStringAsFixed(0)}°C",
                                   style: TextStyle(
                                     fontSize: 32,
                                     color: Color(0xff194E19),
@@ -275,6 +311,20 @@ class _SensorScreenState extends State<SensorScreen> {
                                 ((raw - 1.0) / (10.0 - 1.0)) * 100;
                             pHPercent = pHPercent.clamp(0, 100);
 
+                            final phOutOfRange = pHPercent <= 30;
+                            _maybeAlert(
+                              isAlerting: phOutOfRange,
+                              wasAlerting: _phAlerting,
+                              onEnterAlert: () => NotificationService.addAlert(
+                                context,
+                                title: 'pH Level',
+                                alertType: 'pH Alert',
+                                message:
+                                    'pH level is outside the optimal range.',
+                              ),
+                            );
+                            _phAlerting = phOutOfRange;
+
                             Color progressColor = getProgressColor(pHPercent);
                             Color backgroundColor =
                                 getBackgroundColor(pHPercent);
@@ -336,6 +386,19 @@ class _SensorScreenState extends State<SensorScreen> {
                             double lightPercent =
                                 ((850 - raw) / (850 - 50)) * 100;
                             lightPercent = lightPercent.clamp(0, 100);
+
+                            final lightIsLow = lightPercent <= 30;
+                            _maybeAlert(
+                              isAlerting: lightIsLow,
+                              wasAlerting: _lightAlerting,
+                              onEnterAlert: () => NotificationService.addAlert(
+                                context,
+                                title: 'Light',
+                                alertType: 'Light Alert',
+                                message: 'Light intensity is low.',
+                              ),
+                            );
+                            _lightAlerting = lightIsLow;
 
                             Color progressColor =
                                 getProgressColor(lightPercent);

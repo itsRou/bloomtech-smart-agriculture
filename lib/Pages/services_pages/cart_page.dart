@@ -4,6 +4,7 @@ import '../../admin_provider.dart';
 import '../../cart_provider.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../helper/notification_service.dart';
 
 const Map<String, String> itemImages = {
   'Tomato': 'assets/images/tomato.jpg',
@@ -216,6 +217,28 @@ class _CartPageState extends State<CartPage> {
         .set(dataToSave);
 
     print("✅ Order saved under admin ID: $adminId");
+
+    if (context.mounted) {
+      final itemNames = <String>[
+        ...?(cartData["seeds"] as Map?)?.keys.cast<String>(),
+        ...?(cartData["tools"] as Map?)?.keys.cast<String>(),
+        ...?(cartData["machines"] as Map?)?.keys.cast<String>(),
+        if ((cartData["farmers"] as Map?)?["count"] != null &&
+            (cartData["farmers"] as Map)["count"] > 0)
+          "Farmers",
+      ];
+
+      await NotificationService.addAlert(
+        context,
+        title: 'Order',
+        alertType: 'Booking Confirmation',
+        message: itemNames.isEmpty
+            ? 'Your order has been placed.'
+            : 'Your order for ${itemNames.join(", ")} has been placed.',
+        imagePath: 'assets/images/seeds.png',
+      );
+    }
+
     cartProvider.clearCart();
   } catch (e) {
     print("❌ Failed to save order: $e");

@@ -4,7 +4,7 @@
 
 A Flutter mobile application for automated plant nursery management, developed as a graduation project for the Faculty of Computer Science & Artificial Intelligence, Pharos University in Alexandria (2025). The app provides a real-time interface to a sensor-driven monitoring/irrigation system, an AI-assisted leaf disease scanning workflow, and an in-app agricultural services marketplace.
 
-**Scope note:** This repository contains the **Flutter mobile application**. The project as documented also involves an Arduino/ESP32-based hardware controller and a Flask-based image classification server; neither's source code is included in this repository (see [Architecture](#system-architecture) and [Documentation vs. Implementation Notes](#documentation-vs-implementation-notes) below for exactly what is and isn't verified here).
+**Scope note:** The core of this repository is the **Flutter mobile application** (`lib/`). It also includes reference implementations for the two other subsystems the thesis describes — Arduino/ESP32 firmware (`hardware/`) and a Flask disease-diagnosis server (`backend/`) — written to match the exact interfaces the app already expects. **Neither has been tested against real hardware or a trained model**; see their own READMEs and [Documentation vs. Implementation Notes](#documentation-vs-implementation-notes) for exactly what is and isn't verified.
 
 ---
 
@@ -56,14 +56,14 @@ Many plant nurseries lack real-time, integrated monitoring and automated respons
 | Real-time sensor dashboard (soil moisture, pH, temperature, light) via Firebase Realtime Database | ✅ Implemented |
 | User authentication (sign up) via Firebase Authentication | ✅ Implemented |
 | Admin/user sign-in via Firestore-stored credentials | ⚠️ Implemented, but see security note below |
-| QR-code scanning to register a new area (writes to Realtime Database) | ⚠️ Partially implemented — the scan-and-write path works; the admin area list currently reads from a hardcoded list rather than the live data |
-| Leaf image capture and upload to an external diagnosis endpoint | ✅ Implemented (client side only — see [AI / Disease Detection](#ai--disease-detection)) |
+| QR-code scanning to register a new area (writes to Realtime Database, area list reads it back) | ✅ Implemented — the admin/user area lists now load registered areas from Realtime Database instead of a hardcoded stub |
+| Leaf image capture and upload to an external diagnosis endpoint | ✅ Implemented (client side — see [AI / Disease Detection](#ai--disease-detection)) |
 | Agricultural services marketplace (seeds, tools, machines, farmer hiring, cart, order submission to Firestore) | ✅ Implemented |
 | Admin panel (admin registration, admin home/settings) | ✅ Implemented |
-| Notifications screen | ❌ UI mockup only — static hardcoded cards, no live data or push notifications |
+| Notifications (booking confirmations, threshold alerts) | ✅ Implemented, backed by real Firestore data (`admins/{id}/notifications`) — see [Firebase Usage](#firebase-usage). No push notifications when the app is closed. |
 | English/Arabic localization | ✅ Implemented |
-| Automated irrigation / pH correction hardware (Arduino + ESP32 + relays + pumps) | 📄 Documented but implementation not verified — no firmware source in this repository |
-| CNN/YOLOv5-based disease classification model | 📄 Documented but implementation not verified — no model or server source in this repository |
+| Automated irrigation / pH correction hardware (Arduino + ESP32 + relays + pumps) | 🧪 Reference firmware added in `hardware/` matching the app's Firebase paths — **untested on real hardware**, see `hardware/README.md` |
+| CNN-based disease classification model | 🧪 Reference Flask server added in `backend/` matching the app's request/response contract — **ships with no trained model**, see `backend/README.md` |
 
 ## System Architecture
 
@@ -71,20 +71,20 @@ The diagram below reflects only what is confirmed either in the Flutter source c
 
 ```mermaid
 flowchart LR
-    subgraph HW["Hardware layer — documented, source not in this repository"]
+    subgraph HW["hardware/ — reference firmware, untested on real hardware"]
         Sensors["Soil moisture / pH / DHT11 temperature / LDR light sensors"] --> Arduino["Arduino Uno\n(reads sensors, drives relays)"]
-        Arduino -->|serial| ESP32["ESP32\n(Wi-Fi bridge)"]
-        Arduino --> Relays["Relay modules"] --> Pumps["3x water pumps\n(irrigation / acid / nutrient)"]
+        Arduino -->|serial JSON| ESP32["ESP32\n(Wi-Fi bridge)"]
+        Arduino --> Relays["Relay modules"] --> Pumps["3x water pumps\n(irrigation / acid / alkaline)"]
     end
 
-    ESP32 -->|writes sensor values| RTDB[("Firebase Realtime Database\n/soil_raw /ph_raw /ldr_raw /temperature_raw\n/soil_statues /ph_statues /temperature")]
+    ESP32 -->|writes sensor values| RTDB[("Firebase Realtime Database\n/soil_raw /ph_raw /ldr_raw /temperature_raw\n/soil_statues /ph_statues /temperature\nareas")]
 
-    App["Flutter mobile app\n(this repository)"] -->|reads live readings| RTDB
+    App["Flutter mobile app (lib/)"] -->|reads live readings, area list| RTDB
     App -->|push QR-scanned area| RTDB
     App -->|sign up| Auth[("Firebase Authentication")]
-    App -->|admin/user records, service orders| Firestore[("Cloud Firestore\ncollections: admins, admins/{id}/services")]
-    App -->|multipart image upload| Flask["Flask '/predict' endpoint\n(hardcoded LAN IP in source — external service)"]
-    Flask -.->|not in this repo| Model["Classification model\n(CNN per project docs / YOLOv5 per prior README — unverified)"]
+    App -->|admin/user records, orders, notifications| Firestore[("Cloud Firestore\nadmins, admins/{id}/services, admins/{id}/notifications")]
+    App -->|multipart image upload| Flask["backend/app.py Flask '/predict'\n(reference scaffold, no trained model shipped)"]
+    Flask -.->|you supply| Model["Your trained CNN model\n(models/model.h5 — not included)"]
 ```
 
 ## Hardware Components (documented)
@@ -119,10 +119,9 @@ Confirmed from `pubspec.yaml` and source code:
 - **flutter_localizations** + ARB files — English/Arabic localization
 - **shared_preferences** — persisting the selected locale
 
-Referenced by project documentation / the prior README but **not present as source in this repository**:
-- Python, Flask (the disease-diagnosis server the app talks to)
-- TensorFlow/Keras CNN (per thesis) or YOLOv5 (per the repository's previous README) — the two documents disagree on the model architecture, and neither's training/serving code is included here
-- Arduino IDE / C++ firmware for the Arduino Uno and ESP32
+Reference implementations added alongside the app (see their own READMEs for setup and honest caveats):
+- **Python, Flask, TensorFlow/Keras, Pillow** — `backend/app.py`, a disease-diagnosis server matching the app's request/response contract exactly. Ships with no trained model, class list, or treatment text — you must supply your own.
+- **Arduino IDE (C/C++), ArduinoJson, Adafruit DHT, Firebase ESP Client** — `hardware/arduino_uno/arduino_uno.ino` and `hardware/esp32_gateway/esp32_gateway.ino`, matching the exact Firebase paths the app reads. Untested on real hardware.
 
 ## Project Structure
 
@@ -136,7 +135,7 @@ lib/
 ├── Pages/
 │   ├── AreaListScreenAdmin.dart
 │   ├── AreaListScreenUser.dart
-│   ├── notifications.dart        # Static UI mockup (see Key Features)
+│   ├── notifications.dart        # Live Firestore-backed notifications feed
 │   ├── qr_scan_screen.dart       # QR scan -> Realtime Database 'areas' node
 │   ├── scan_page.dart            # Leaf image capture -> POST to /predict
 │   ├── user_planet_screen.dart
@@ -145,7 +144,8 @@ lib/
 │   ├── sensors_pages/              # pH / soil moisture / combined sensor dashboards
 │   └── services_pages/             # Seeds, tools, machines, farmer hiring, cart
 ├── helper/
-│   └── dimintions.dart            # Responsive sizing helpers
+│   ├── dimintions.dart            # Responsive sizing helpers
+│   └── notification_service.dart  # Writes alerts/bookings to Firestore notifications
 ├── widget/                        # ~18 shared UI components
 └── l10n/
     ├── app_en.arb
@@ -155,6 +155,9 @@ assets/
 ├── images/                        # UI illustrations/icons
 ├── screenShots/                   # App screenshots used in this README
 └── fonts/                         # K2D font family
+
+hardware/                          # Reference Arduino/ESP32 firmware (untested) — see hardware/README.md
+backend/                           # Reference Flask disease-diagnosis server (no model included) — see backend/README.md
 ```
 
 ## Installation
@@ -184,13 +187,13 @@ This repository does **not** include the original developer's live Firebase cred
 flutter run
 ```
 
-The disease-diagnosis feature additionally requires a reachable server implementing the `/predict` endpoint the app calls (see [AI / Disease Detection](#ai--disease-detection)); that server's source is not part of this repository.
+The disease-diagnosis feature additionally requires a running server implementing the `/predict` endpoint — see [`backend/README.md`](backend/README.md) to run the included reference Flask server (you'll need to supply your own trained model). The hardware-driven sensor readings require the firmware in [`hardware/`](hardware/README.md) flashed to real Arduino/ESP32 boards; without it, the sensor dashboard will simply show a loading spinner (no data at those Realtime Database paths).
 
 ## AI / Disease Detection
 
-From `lib/Pages/scan_page.dart`: the user captures or picks a leaf photo, which is sent as a multipart HTTP POST to an external `/predict` endpoint. The app expects a JSON response containing a `status` field and, optionally, a `cure` recommendation and a base64-encoded annotated image.
+From `lib/Pages/scan_page.dart`: the user captures or picks a leaf photo, which is sent as a multipart HTTP POST to a `/predict` endpoint. The app expects a JSON response containing a `status` field and, optionally, a `cure` recommendation and a base64-encoded image.
 
-The model/server behind this endpoint is **not included in this repository**. The project's thesis documentation describes a custom Convolutional Neural Network trained with TensorFlow/Keras and served via Flask; this repository's own prior README instead described a YOLOv5-based pipeline with weights hosted on Google Drive. Since neither the training code nor the server is present here, the actual model architecture and any accuracy figures are **not verified** — no accuracy percentage is claimed.
+A reference server implementing this exact contract is included at [`backend/app.py`](backend/app.py) — see [`backend/README.md`](backend/README.md). It ships with **no trained model, class list, or treatment data**: the thesis documentation describes a custom CNN trained with TensorFlow/Keras, while this repository's prior README instead described a YOLOv5-based pipeline with weights hosted on Google Drive. These two descriptions conflict and neither's actual training code or dataset was available, so the scaffold assumes the CNN/Keras architecture and requires you to supply a real model file — no accuracy figures are claimed anywhere.
 
 ## Firebase Usage
 
@@ -204,6 +207,7 @@ Exact paths/collections found in the source (no others are used):
 **Cloud Firestore**
 - `admins` — admin and user account records (including the password fields used at sign-in)
 - `admins/{adminId}/services/order_{timestamp}` — marketplace orders submitted from the cart
+- `admins/{adminId}/notifications` — live notification feed (booking confirmations from checkout; low-moisture/pH/light alerts from the sensor dashboard), read by `notifications.dart`, written by `lib/helper/notification_service.dart`
 
 **Firebase Authentication**
 - Used for new user registration (`createUserWithEmailAndPassword`); not currently used for sign-in (see security note above).
@@ -218,11 +222,12 @@ No Firebase Storage usage was found in the codebase.
 
 A few points worth knowing before relying on the thesis documentation as a description of this codebase:
 
-- **Disease detection backend**: the thesis describes a Flask + CNN (TensorFlow/Keras) service; this repo's previous README described Python + YOLOv5 instead. Neither the server nor the model is included here — only the client-side HTTP call.
-- **Arduino/ESP32 firmware**: fully described in the documentation, but no `.ino`/C++ source exists in this repository.
-- **Notifications**: documented as a real alert/reminder system; implemented in code only as a static UI mockup.
-- **QR area registration**: the write path (scan → Realtime Database) works as documented; the corresponding admin read path currently uses a hardcoded list instead of the live data.
-- **Admin/user authentication**: not detailed in the documentation; implemented via a single Firestore `admins` collection with separate plaintext password fields per role, checked client-side rather than through Firebase Authentication sign-in.
+- **Disease detection backend**: the thesis describes a Flask + CNN (TensorFlow/Keras) service; this repo's previous README described Python + YOLOv5 instead. A reference Flask server matching the app's exact contract is now included at `backend/`, but it ships with **no trained model** — you must supply one, so the real model architecture and accuracy remain unverified either way.
+- **Arduino/ESP32 firmware**: fully described in the documentation. Reference firmware matching the app's exact Firebase paths is now included at `hardware/`, but it has **not been tested on real hardware** — no board/sensors were available to verify it against.
+- **Notifications**: now backed by real Firestore data (booking confirmations and sensor threshold alerts) instead of the original static mockup. Still in-app only — no push notifications when the app is closed, since that would require `firebase_messaging`, platform push setup, and a server-side trigger, none of which are in scope here.
+- **QR area registration**: now fully wired — the admin/user area lists read the same Realtime Database `areas` node that the QR scan writes to, instead of a hardcoded stub list.
+- **Sensor dashboard temperature display**: fixed a pre-existing display bug where the raw Celsius value from `/temperature_raw` was divided by 100 and shown as a misleading "25%"; it now shows the actual `°C` reading on a 0-50°C gauge.
+- **Admin/user authentication**: not detailed in the documentation; implemented via a single Firestore `admins` collection with separate plaintext password fields per role, checked client-side rather than through Firebase Authentication sign-in. **Left as-is** (not changed in this pass) — fixing it properly would require migrating to real Firebase Auth sign-in and would break any accounts already created under the old scheme.
 
 ## Screenshots
 

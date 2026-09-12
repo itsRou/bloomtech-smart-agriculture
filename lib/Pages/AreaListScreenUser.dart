@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'scan_page.dart';
@@ -13,13 +14,46 @@ class AreaListScreen extends StatefulWidget {
 }
 
 class _AreaListScreenState extends State<AreaListScreen> {
-  List<Map<String, String>> areas = [
-    {"id": "1", "value": "50000"},
-    {"id": "2", "value": "762537"},
-    {"id": "3", "value": "092892"},
-  ];
+  List<Map<String, String>> areas = [];
+  bool _loading = true;
 
   String searchQuery = "";
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAreas();
+  }
+
+  Future<void> _loadAreas() async {
+    try {
+      final snapshot = await FirebaseDatabase.instance.ref('areas').get();
+      final loaded = <Map<String, String>>[];
+      if (snapshot.exists && snapshot.value is Map) {
+        final data = Map<dynamic, dynamic>.from(snapshot.value as Map);
+        data.forEach((key, value) {
+          if (value is Map) {
+            loaded.add({
+              "id": key.toString(),
+              "value": (value['name'] ?? '').toString(),
+            });
+          }
+        });
+      }
+      if (mounted) {
+        setState(() {
+          areas = loaded;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -104,7 +138,16 @@ class _AreaListScreenState extends State<AreaListScreen> {
 
             // ===== Area List =====
             Expanded(
-              child: ListView.builder(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : filteredAreas.isEmpty
+                      ? Center(
+                          child: Text(
+                            "No areas registered yet.",
+                            style: TextStyle(color: Color(0xff194E19)),
+                          ),
+                        )
+                      : ListView.builder(
                 itemCount: filteredAreas.length,
                 itemBuilder: (context, index) {
                   final area = filteredAreas[index];
