@@ -155,6 +155,25 @@ def predict():
     return jsonify(response)
 
 
+@app.route("/", methods=["GET"])
+def index():
+    # A friendly landing page instead of Flask's default 404, since this
+    # URL is meant to be a shareable demo link people click directly.
+    return jsonify({
+        "service": "BloomTech disease-diagnosis backend (demo)",
+        "model_loaded": _model is not None,
+        "endpoints": {
+            "GET /health": "Reports whether a trained model is loaded.",
+            "POST /predict": "multipart field 'image' -> diagnosis JSON. "
+                              "No model is configured on this demo "
+                              "deployment, so this always returns an "
+                              "honest 'unavailable' status rather than a "
+                              "fabricated result.",
+        },
+        "source": "https://github.com/itsRou/bloomtech-smart-agriculture/tree/main/backend",
+    })
+
+
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"model_loaded": _model is not None})
