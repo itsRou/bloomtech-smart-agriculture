@@ -52,10 +52,17 @@ Future<void> _requestPermissions() async {
 }
 
 
+  // Points at the live demo backend (see backend/README.md). It ships with
+  // no trained model, so it always returns an honest "diagnosis
+  // unavailable" status rather than a real prediction - replace with your
+  // own server once you have a trained model to serve.
+  static const String _predictEndpoint =
+      "https://backend-beryl-two-14.vercel.app/predict";
+
   Future<void> _uploadImage(File image) async {
     var request = http.MultipartRequest(
       'POST',
-      Uri.parse("http://192.168.120.229:5000/predict"),
+      Uri.parse(_predictEndpoint),
     );
 
     request.files.add(await http.MultipartFile.fromPath('image', image.path));

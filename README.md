@@ -178,7 +178,7 @@ This repository does **not** include the original developer's live Firebase cred
 2. Install the FlutterFire CLI and run `flutterfire configure` from the project root — this generates `lib/firebase_options.dart` for your project. A template with the expected shape is provided at [`lib/firebase_options.example.dart`](lib/firebase_options.example.dart).
 3. For Android, this also downloads `android/app/google-services.json` for you. A template of its expected structure is at [`android/app/google-services.example.json`](android/app/google-services.example.json).
 4. Update the Realtime Database with matching node names if you want the sensor dashboard to show live data: `/soil_raw`, `/ph_raw`, `/ldr_raw`, `/temperature_raw`, `/soil_statues`, `/ph_statues`, `/temperature`.
-5. If you stand up your own disease-diagnosis server, update the hardcoded endpoint in [`lib/Pages/scan_page.dart`](lib/Pages/scan_page.dart) (currently a placeholder LAN address) to point at your server's `/predict` route.
+5. The app's disease-scan endpoint (`lib/Pages/scan_page.dart`) currently points at a live demo deployment of `backend/` on Vercel (see below) rather than the original developer's LAN address. If you stand up your own server (e.g. once you have a real trained model), update `_predictEndpoint` in that file to point at it.
 6. **Security note:** the current sign-in flow queries the Firestore `admins` collection and compares plaintext password fields client-side, rather than using `FirebaseAuth.signInWithEmailAndPassword`. If you intend to run this beyond a local demo, this should be replaced with proper Firebase Authentication sign-in and your Firestore/Realtime Database security rules should be reviewed — neither is configured by this repository.
 
 ## Running the Project
@@ -187,13 +187,15 @@ This repository does **not** include the original developer's live Firebase cred
 flutter run
 ```
 
-The disease-diagnosis feature additionally requires a running server implementing the `/predict` endpoint — see [`backend/README.md`](backend/README.md) to run the included reference Flask server (you'll need to supply your own trained model). The hardware-driven sensor readings require the firmware in [`hardware/`](hardware/README.md) flashed to real Arduino/ESP32 boards; without it, the sensor dashboard will simply show a loading spinner (no data at those Realtime Database paths).
+By default, the disease-scan feature talks to a **live demo deployment** of `backend/` on Vercel — see [AI / Disease Detection](#ai--disease-detection) below for exactly what that does and doesn't do. The hardware-driven sensor readings require the firmware in [`hardware/`](hardware/README.md) flashed to real Arduino/ESP32 boards; without it, the sensor dashboard will simply show a loading spinner (no data at those Realtime Database paths).
 
 ## AI / Disease Detection
 
 From `lib/Pages/scan_page.dart`: the user captures or picks a leaf photo, which is sent as a multipart HTTP POST to a `/predict` endpoint. The app expects a JSON response containing a `status` field and, optionally, a `cure` recommendation and a base64-encoded image.
 
-A reference server implementing this exact contract is included at [`backend/app.py`](backend/app.py) — see [`backend/README.md`](backend/README.md). It ships with **no trained model, class list, or treatment data**: the thesis documentation describes a custom CNN trained with TensorFlow/Keras, while this repository's prior README instead described a YOLOv5-based pipeline with weights hosted on Google Drive. These two descriptions conflict and neither's actual training code or dataset was available, so the scaffold assumes the CNN/Keras architecture and requires you to supply a real model file — no accuracy figures are claimed anywhere.
+A reference server implementing this exact contract is included at [`backend/app.py`](backend/app.py) and deployed live at **https://backend-beryl-two-14.vercel.app** — see [`backend/README.md`](backend/README.md). It ships with **no trained model, class list, or treatment data**: the thesis documentation describes a custom CNN trained with TensorFlow/Keras, while this repository's prior README instead described a YOLOv5-based pipeline with weights hosted on Google Drive. These two descriptions conflict and neither's actual training code or dataset was available, so the scaffold assumes the CNN/Keras architecture and requires you to supply a real model file — no accuracy figures are claimed anywhere.
+
+Because of this, the live demo's `/predict` always responds with an honest `"Diagnosis unavailable - no trained model is configured on this deployment yet."` status rather than a fabricated result — you can verify this yourself with `curl https://backend-beryl-two-14.vercel.app/health`. The demo deployment also intentionally excludes TensorFlow (Vercel's serverless size limit can't fit it); [`backend/requirements-full.txt`](backend/requirements-full.txt) has the complete dependency set for running a real model locally or on an ML-suited host (Render, Railway, Cloud Run, Hugging Face Spaces).
 
 ## Firebase Usage
 
