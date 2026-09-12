@@ -2,6 +2,8 @@
 
 > "From a single pot to a full field — BloomTech grows with you."
 
+**🔗 Live demo: [itsrou.github.io/bloomtech-smart-agriculture](https://itsrou.github.io/bloomtech-smart-agriculture/)** — the actual app running in your browser (Flutter web build). Sign-up/login and the marketplace write to the project's real Firebase backend; the disease-scan feature talks to the [live demo API](#ai--disease-detection), which honestly reports no model is configured yet rather than faking a diagnosis.
+
 A Flutter mobile application for automated plant nursery management, developed as a graduation project for the Faculty of Computer Science & Artificial Intelligence, Pharos University in Alexandria (2025). The app provides a real-time interface to a sensor-driven monitoring/irrigation system, an AI-assisted leaf disease scanning workflow, and an in-app agricultural services marketplace.
 
 **Scope note:** The core of this repository is the **Flutter mobile application** (`lib/`). It also includes reference implementations for the two other subsystems the thesis describes — Arduino/ESP32 firmware (`hardware/`) and a Flask disease-diagnosis server (`backend/`) — written to match the exact interfaces the app already expects. **Neither has been tested against real hardware or a trained model**; see their own READMEs and [Documentation vs. Implementation Notes](#documentation-vs-implementation-notes) for exactly what is and isn't verified.
@@ -188,6 +190,17 @@ flutter run
 ```
 
 By default, the disease-scan feature talks to a **live demo deployment** of `backend/` on Vercel — see [AI / Disease Detection](#ai--disease-detection) below for exactly what that does and doesn't do. The hardware-driven sensor readings require the firmware in [`hardware/`](hardware/README.md) flashed to real Arduino/ESP32 boards; without it, the sensor dashboard will simply show a loading spinner (no data at those Realtime Database paths).
+
+### Redeploying the web demo
+
+The live link at the top of this README is a static Flutter web build served from this repo's `gh-pages` branch via GitHub Pages. To publish a new build after making changes:
+
+```bash
+flutter build web --release --base-href /bloomtech-smart-agriculture/
+# then push the contents of build/web/ to the gh-pages branch
+```
+
+**Heads up:** this is a real build of the app connected to the project's live Firebase backend — anyone with the link can sign up, place marketplace orders, and read/write whatever the current Firestore/Realtime Database security rules allow (see the security note above). Treat it as a public demo, not a private one.
 
 ## AI / Disease Detection
 
