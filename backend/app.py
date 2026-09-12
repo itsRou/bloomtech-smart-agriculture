@@ -130,8 +130,15 @@ def predict():
 
     try:
         status, cure = predict_image(image)
-    except RuntimeError as e:
-        return jsonify({"error": str(e)}), 503
+    except RuntimeError:
+        # No model configured (e.g. this is the Vercel demo stub, which
+        # ships without TensorFlow/a model file - see README "Deploying a
+        # demo stub to Vercel"). Respond with a valid "status" field rather
+        # than a bare error, since that's the field the Flutter app reads.
+        return jsonify({
+            "status": "Diagnosis unavailable - no trained model is "
+                      "configured on this deployment yet.",
+        })
 
     response = {"status": status}
     if cure:

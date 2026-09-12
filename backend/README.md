@@ -6,13 +6,18 @@
 
 The project's thesis documentation describes a custom CNN trained with TensorFlow/Keras and served via Flask. This repository's own prior README instead described a YOLOv5-based pipeline with weights hosted on Google Drive. These two descriptions conflict, and neither the training code, the dataset, nor the resulting weights were provided - so this scaffold cannot include real model accuracy, class names, or treatment advice without inventing them. It assumes the CNN/Keras architecture (the more specific of the two descriptions) so you have a concrete API to fill in; see the comment at the top of `app.py` if you want to adapt it to serve a YOLOv5 model instead.
 
-## Setup
+## Two dependency sets
+
+- **`requirements.txt`** - Flask + Pillow + NumPy only. No TensorFlow. The server boots and responds, but `/predict` always returns a "no model configured" status, since there's nothing to run inference with. This is what the Vercel demo deployment below uses - TensorFlow's package size (400MB+) exceeds Vercel's serverless function size limit, so it can't be included there regardless.
+- **`requirements-full.txt`** - adds TensorFlow, for local development or a proper ML host once you have a real trained model. Use this set anywhere you intend `/predict` to actually classify images.
+
+## Local setup (with a real model)
 
 ```bash
 cd backend
 python -m venv venv
 source venv/bin/activate  # or venv\Scripts\activate on Windows
-pip install -r requirements.txt
+pip install -r requirements-full.txt
 ```
 
 Then supply your own:
@@ -27,6 +32,14 @@ python app.py
 ```
 
 This starts the server on `0.0.0.0:5000` so a phone on the same Wi-Fi network can reach it - update the IP in [`lib/Pages/scan_page.dart`](../lib/Pages/scan_page.dart) to match the machine running this server (find it with `ipconfig`/`ifconfig`), since the currently hardcoded address is specific to the original developer's network.
+
+## Deploying a demo stub to Vercel
+
+`vercel.json` is included so Vercel's Flask auto-detection deploys this folder as-is, using the lightweight `requirements.txt` (no TensorFlow, so it fits within Vercel's function size limit). This gives you a real, working public URL - but since no model ships with the repo, every `/predict` call will honestly report that diagnosis isn't available yet, rather than fabricating a result.
+
+To deploy: on vercel.com, "Add New Project" -> import the `bloomtech-smart-agriculture` GitHub repo -> set the project's root directory to `backend`. Vercel should auto-detect Flask from `vercel.json`.
+
+**This is not where you'd deploy a real model.** TensorFlow doesn't fit in Vercel's Python serverless size limit at all. Once you have a trained model, deploy the `requirements-full.txt` version to a host built for ML workloads instead - Render, Railway, Google Cloud Run, or Hugging Face Spaces all handle this properly.
 
 ## API
 
